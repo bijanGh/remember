@@ -1,6 +1,7 @@
 import { useRef, useState } from "react";
 import { Canvas, useFrame } from "@react-three/fiber";
 import { OrbitControls } from "@react-three/drei";
+import * as THREE from "three";
 
 function Box(props: any) {
   // This reference gives us direct access to the THREE.Mesh object
@@ -9,7 +10,7 @@ function Box(props: any) {
   const [hovered, hover] = useState(false);
   const [clicked, click] = useState(false);
   // Subscribe this component to the render-loop, rotate the mesh every frame
-  useFrame((state, delta) => (ref.current.rotation.x += delta));
+  // useFrame((state, delta) => (ref.current.rotation.x += delta));
   // Return the view, these are regular Threejs elements expressed in JSX
   return (
     <mesh
@@ -20,9 +21,65 @@ function Box(props: any) {
       onPointerOver={(event) => (event.stopPropagation(), hover(true))}
       onPointerOut={(event) => hover(false)}
     >
-      <boxGeometry args={[1, 1, 1]} />
+      <circleGeometry args={[0.5, 30]} />
       <meshStandardMaterial color={hovered ? "hotpink" : "orange"} />
     </mesh>
+  );
+}
+
+function Points(props: any) {
+  const SEPARATION = 100,
+    AMOUNTX = 50,
+    AMOUNTY = 50;
+
+  const numParticles = AMOUNTX * AMOUNTY;
+
+  const positions = new Float32Array(numParticles * 3);
+  const scales = new Float32Array(numParticles);
+
+  let i = 0,
+    j = 0;
+
+  for (let ix = 0; ix < AMOUNTX; ix++) {
+    for (let iy = 0; iy < AMOUNTY; iy++) {
+      positions[i] = ix * SEPARATION - (AMOUNTX * SEPARATION) / 2; // x
+      positions[i + 1] = 0; // y
+      positions[i + 2] = iy * SEPARATION - (AMOUNTY * SEPARATION) / 2; // z
+
+      scales[j] = 1;
+
+      i += 3;
+      j++;
+    }
+  }
+
+  return (
+    <points {...props}>
+      <bufferGeometry attach="geometry">
+        <bufferAttribute
+          attach={"attributes-position"}
+          count={positions.length / 3}
+          array={positions}
+          itemSize={3}
+        />
+      </bufferGeometry>
+      <shaderMaterial
+        transparent={true}
+        depthTest={false}
+        uniforms={{
+          size: { value: 10 },
+          scale: { value: 1 },
+          color: { value: new THREE.Color("red") },
+        }}
+        vertexShader={THREE.ShaderLib.points.vertexShader}
+        fragmentShader="uniform vec3 color;
+    void main() {
+        vec2 xy = gl_PointCoord.xy - vec2(0.5);
+        float ll = length(xy);
+        gl_FragColor = vec4(color, step(ll, 0.5));
+    }"
+      />
+    </points>
   );
 }
 
@@ -32,9 +89,9 @@ function generateScatterPoints(count, minDistance) {
 
   while (points.length < count && attempts < 1000) {
     // Limit attempts to avoid infinite loops
-    const x = Math.random() * 200 - 10; // Adjust the range as needed
-    const y = Math.random() * 200 - 10; // Adjust the range as needed
-    const z = Math.random() * 20 - 10; // Adjust the range as needed
+    const x = Math.random() * 100 - 50; // Adjust the range as needed
+    const y = Math.random() * 100 - 50; // Adjust the range as needed
+    const z = Math.random() * 10 - 50; // Adjust the range as needed
 
     if (isValidPoint([x, y, z], points, minDistance)) {
       points.push([x, y, z]);
@@ -62,8 +119,6 @@ function isValidPoint(newPoint, existingPoints, minDistance) {
 }
 
 export default function App() {
-  const boxes = generateScatterPoints(300, 3);
-
   return (
     <div
       style={{
@@ -71,7 +126,9 @@ export default function App() {
         width: "100dvw",
       }}
     >
-      <Canvas>
+      <Canvas
+        camera={{ fov: 75, near: 1, far: 10000, position: [300, 300, 1000] }}
+      >
         <ambientLight intensity={Math.PI / 2} />
         <spotLight
           position={[10, 10, 10]}
@@ -81,9 +138,8 @@ export default function App() {
           intensity={Math.PI}
         />
         <pointLight position={[-10, -10, -10]} decay={0} intensity={Math.PI} />
-        {boxes.map((b) => (
-          <Box position={b} />
-        ))}
+
+        <Points />
         <OrbitControls />
       </Canvas>
     </div>
